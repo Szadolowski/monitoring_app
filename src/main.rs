@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-
+mod error;  // musi być pierwszy, jeśli inne moduły z niego korzystają
+mod config; // teraz Rust znajdzie Twój plik config.rs
 mod db;
-mod error;
 mod state;
 mod sync;
 mod ui;

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{BufReader, BufWriter};
 use std::path::PathBuf;
+use std::env;
 
 /// Reprezentuje pojedynczą ścieżkę do monitorowania (odwzorowanie z bazy)
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -33,8 +34,19 @@ impl Default for AppConfig {
     }
 }
 
+/// Pobiera adres bazy danych z .env lub używa domyślnego (fallback)
+pub fn get_database_url() -> String {
+    // 1. Spróbuj wczytać .env (zadziała w dev, w MSI zazwyczaj nie)
+    dotenvy::dotenv().ok();
+
+    // 2. Pobierz DATABASE_URL z systemu. 
+    // JEŚLI NIE MA: użyj wpisanego na sztywno adresu IP Twojego serwera.
+    env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://user:password@192.168.1.100/db_name".to_string())
+}
+
 /// Helper do pobierania bezpiecznej ścieżki w %APPDATA%
-fn get_config_path() -> Result<PathBuf> {
+pub fn get_config_path() -> Result<PathBuf> {
     // Te wartości ukształtują ścieżkę: AppData/Roaming/MojaFirma/FileMonitorAgent
     let proj_dirs = ProjectDirs::from("com", "MojaFirma", "FileMonitorAgent")
         .ok_or_else(|| AppError::Config("Nie można zlokalizować katalogu AppData w systemie".to_string()))?;
@@ -43,7 +55,7 @@ fn get_config_path() -> Result<PathBuf> {
     
     // Upewniamy się, że folder istnieje, zanim spróbujemy w nim cokolwiek zapisać
     if !config_dir.exists() {
-        fs::create_dir_all(config_dir)?;
+        fs::create_dir_all(config_dir).map_err(|e| AppError::Config(e.to_string()))?;
     }
 
     Ok(config_dir.join("config.json"))
@@ -58,9 +70,9 @@ pub fn load_local_config() -> Result<AppConfig> {
         return Ok(AppConfig::default());
     }
 
-    let file = fs::File::open(path)?;
+    let file = fs::File::open(path).map_err(|e| AppError::Config(e.to_string()))?;
     let reader = BufReader::new(file);
-    let config = serde_json::from_reader(reader)?;
+    let config = serde_json::from_reader(reader).map_err(|e| AppError::Config(e.to_string()))?;
 
     tracing::info!("Konfiguracja załadowana pomyślnie z lokalnego dysku.");
     Ok(config)
@@ -69,10 +81,10 @@ pub fn load_local_config() -> Result<AppConfig> {
 /// Zapisuje konfigurację na dysk (używane po udanym pobraniu danych z bazy)
 pub fn save_local_config(config: &AppConfig) -> Result<()> {
     let path = get_config_path()?;
-    let file = fs::File::create(&path)?;
+    let file = fs::File::create(&path).map_err(|e| AppError::Config(e.to_string()))?;
     let writer = BufWriter::new(file);
     
-    serde_json::to_writer_pretty(writer, config)?;
+    serde_json::to_writer_pretty(writer, config).map_err(|e| AppError::Config(e.to_string()))?;
     
     tracing::info!("Konfiguracja zapisana pomyślnie pod ścieżką: {:?}", path);
     Ok(())
