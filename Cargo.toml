@@ -7,6 +7,9 @@ description = "Agent do monitorowania plikow i synchronizacji z baza danych."
 license = "MIT"
 repository = "https://github.com/Szadolowski/monitoring_app"
 
+[package.metadata.dist]
+targets = ["x86_64-pc-windows-msvc"]
+
 [package.metadata.wix]
 upgrade-guid = "48C5CDCF-A086-41E5-A72B-ED85F89B7C9A"
 path-guid = "408CAA29-F094-4D27-9E69-760C1EB8B3A2"
