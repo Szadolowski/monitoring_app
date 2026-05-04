@@ -1,6 +1,6 @@
 [package]
 name = "file-monitor-agent"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["Rafal Curzydlo <rafalcurzydlo.biz@gmail.com>"]
 description = "Agent do monitorowania plikow i synchronizacji z baza danych."
@@ -9,6 +9,7 @@ repository = "https://github.com/Szadolowski/monitoring_app"
 
 [package.metadata.dist]
 targets = ["x86_64-pc-windows-msvc"]
+shortcut = ["file-monitor-agent"]
 
 [package.metadata.wix]
 upgrade-guid = "48C5CDCF-A086-41E5-A72B-ED85F89B7C9A"
@@ -18,7 +19,7 @@ eula = false
 
 [dependencies]
 # Asynchronicznosc
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1.52.1", features = ["full"] }
 
 # Baza danych (PostgreSQL)
 sqlx = { version = "0.8.6", features = ["runtime-tokio-native-tls", "postgres", "macros", "chrono"] }
