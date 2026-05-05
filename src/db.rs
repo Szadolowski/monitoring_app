@@ -10,11 +10,10 @@ pub struct DbClient {
 }
 
 impl DbClient {
-    /// Inicjalizuje pulę połączeń z rygorystycznymi limitami czasowymi
     pub async fn new(database_url: &str) -> Result<Self> {
         let pool = PgPoolOptions::new()
-            .max_connections(3) // To lekki agent, nie potrzebuje wielu połączeń
-            .acquire_timeout(Duration::from_secs(5)) // Szybki upadek (fail-fast) przy braku sieci
+            .max_connections(3)
+            .acquire_timeout(Duration::from_secs(5))
             .connect(database_url)
             .await?;
 
@@ -22,11 +21,14 @@ impl DbClient {
         Ok(Self { pool })
     }
 
-    /// Pobiera listę profili (używane podczas pierwszego uruchomienia/Onboardingu)
-    pub async fn get_profiles(&self) -> Result<Vec<(i32, String, String, String)>> {
+    /// Pobiera listę profili dla danej grupy (1 = Biuro, 2 = Brygadzista)
+    pub async fn get_profiles_by_group(&self, group_id: i32) -> Result<Vec<(i32, String, String, String)>> {
         let records = sqlx::query(
-            "SELECT id, profile_name, pin_code, COALESCE(description, '') as description FROM public.monitoring_profiles"
+            "SELECT id, profile_name, password_hash, COALESCE(description, '') as description 
+             FROM public.monitoring_profiles 
+             WHERE group_id = $1"
         )
+        .bind(group_id)
         .fetch_all(&self.pool)
         .await?;
 
@@ -35,28 +37,30 @@ impl DbClient {
             .map(|row| {
                 let id: i32 = row.get("id");
                 let name: String = row.get("profile_name");
-                let pin_hash: String = row.try_get("pin_code").unwrap_or_default();
-                let desc: String = row.get("description"); // Nasz nowy opis
-                (id, name, pin_hash, desc)
+                let hash: String = row.try_get("password_hash").unwrap_or_default();
+                let desc: String = row.get("description");
+                (id, name, hash, desc)
             })
             .collect();
 
         Ok(profiles)
     }
 
-    /// Pobiera aktywne ścieżki do monitorowania dla wybranego profilu
-    pub async fn get_paths_for_profile(&self, profile_id: i32) -> Result<Vec<WatchedPath>> {
+    /// Pobiera aktywne ścieżki dla JEDNEGO LUB WIELU profili naraz
+    pub async fn get_paths_for_profiles(&self, profile_ids: &[i32]) -> Result<Vec<WatchedPath>> {
+        // Używamy ANY($1), aby Postgres dopasował id profilu do naszej listy
         let records = sqlx::query(
-            "SELECT id, path, notification_msg FROM public.watched_paths WHERE profile_id = $1 AND is_active = true"
+            "SELECT id, path, notification_msg 
+             FROM public.watched_paths 
+             WHERE profile_id = ANY($1) AND is_active = true"
         )
-        .bind(profile_id)
+        .bind(profile_ids)
         .fetch_all(&self.pool)
         .await?;
 
         let paths = records
             .into_iter()
             .map(|row| {
-                // Rzutujemy duże liczby z Postgresa (bigint) na i64
                 let id: i64 = row.get("id");
                 let path: String = row.get("path");
                 let notification_msg: Option<String> = row.try_get("notification_msg").ok();

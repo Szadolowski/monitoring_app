@@ -9,14 +9,14 @@ pub async fn start_sync_worker(client: DbClient, mut config: AppConfig, state: c
     loop {
         interval.tick().await;
 
-        if config.profile_id == 0 {
-            tracing::info!("Brak profilu. Worker synchronizacji usypia.");
-            continue; 
+        if config.active_profile_ids.is_empty() {
+            tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+            continue;
         }
 
         tracing::info!("Rozpoczynam synchronizację dla profilu: {}", config.profile_name);
 
-        match client.get_paths_for_profile(config.profile_id).await {
+        match client.get_paths_for_profiles(&config.active_profile_ids).await {
             Ok(paths) => {
                 tracing::info!("Pobrano {} ścieżek z bazy.", paths.len());
                 

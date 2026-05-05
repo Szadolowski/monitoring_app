@@ -13,6 +13,7 @@ pub async fn start_watching(app_config: &AppConfig, state: crate::state::SharedS
     }
 
     // FAZA 1: SYSTEM CATCH-UP (SKANOWANIE ZALEGŁOŚCI OFFLINE)
+    // Opcja 1: Jeśli to pierwsze uruchomienie (0), ignorujemy historię i robimy "kalibrację".
     if app_config.last_scan_time > 0 {
         tracing::info!("Wykonywanie skanowania wyrównawczego...");
         for wp in &app_config.watched_paths {
@@ -30,6 +31,7 @@ pub async fn start_watching(app_config: &AppConfig, state: crate::state::SharedS
                     if let Ok(metadata) = entry.metadata() {
                         if let Ok(modified) = metadata.modified() {
                             if let Ok(duration) = modified.duration_since(UNIX_EPOCH) {
+                                // Sprawdzamy czy plik jest nowszy niż czas naszego ostatniego udanego skanu
                                 if duration.as_secs() > app_config.last_scan_time {
                                     tracing::info!("Catch-up: Wykryto zaległy plik -> {:?}", entry.path());
                                     
@@ -46,6 +48,8 @@ pub async fn start_watching(app_config: &AppConfig, state: crate::state::SharedS
                 }
             }
         }
+    } else {
+        tracing::info!("Pierwsze uruchomienie profilu (last_scan_time = 0). Wykonuję kalibrację bazy. Ignoruję istniejące pliki, aby uniknąć spamu powiadomień.");
     }
 
     // FAZA 2: STANDARDOWY NASŁUCH W CZASIE RZECZYWISTYM

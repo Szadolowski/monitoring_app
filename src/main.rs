@@ -29,11 +29,18 @@ fn main() -> Result<()> {
     let db_url = env::var("DATABASE_URL")
         .unwrap_or_else(|_| String::from("postgres://postgres:postgres@localhost:5432/postgres"));
 
-    let mut profiles_for_ui = Vec::new();
-    if config.profile_id == 0 {
+    let mut biuro_profiles = Vec::new();
+    let mut brygadzista_profiles = Vec::new();
+
+    // Sprawdzamy czy lista wybranych profili jest pusta zamiast starego profile_id == 0
+    if config.active_profile_ids.is_empty() {
         if let Ok(client) = rt.block_on(db::DbClient::new(&db_url)) {
-            if let Ok(profiles) = rt.block_on(client.get_profiles()) {
-                profiles_for_ui = profiles;
+            // Pobieramy profile dla obu grup
+            if let Ok(profiles) = rt.block_on(client.get_profiles_by_group(1)) {
+                biuro_profiles = profiles;
+            }
+            if let Ok(profiles) = rt.block_on(client.get_profiles_by_group(2)) {
+                brygadzista_profiles = profiles;
             }
         }
     }
@@ -42,24 +49,22 @@ fn main() -> Result<()> {
     let app_state = Arc::new(Mutex::new(AppState {
         events: Vec::new(),
         watched_folders: initial_folders,
-        current_profile_id: config.profile_id,
-        available_profiles: profiles_for_ui,
+        current_profile_id: 0, // Zostawione do kompatybilności starszych funkcji UI
+        available_profiles: biuro_profiles,
+        available_brygadzista_profiles: brygadzista_profiles,
     }));
 
-    // NOWE: Przechowujemy opcjonalny uchwyt zadania w tle
     let mut initial_worker = None;
 
-    if config.profile_id != 0 {
+    if !config.active_profile_ids.is_empty() {
         let state_for_watcher = app_state.clone();
         let state_for_sync = app_state.clone();
         let config_for_background = config.clone();
         let url_for_bg = db_url.clone();
 
-        // Przypisujemy zgrupowane procesy do jednego uchwytu (JoinHandle)
         initial_worker = Some(rt.spawn(async move {
             let client_opt = db::DbClient::new(&url_for_bg).await.ok();
 
-            // Używamy złączenia futures (tokio::join!), aby żyły jako jedno zadanie nadrzędne
             let sync_future = async {
                 if let Some(client) = client_opt {
                     crate::sync::start_sync_worker(client, config_for_background.clone(), state_for_sync).await;
@@ -83,7 +88,6 @@ fn main() -> Result<()> {
 
     let rt_handle = rt.handle().clone();
 
-    // Przekazujemy initial_worker do UI
     eframe::run_native(
         "File Monitor Agent",
         options,

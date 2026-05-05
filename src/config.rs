@@ -16,7 +16,7 @@ pub struct WatchedPath {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppConfig {
-    pub profile_id: i32,
+    pub active_profile_ids: Vec<i32>,
     pub profile_name: String,
     pub watched_paths: Vec<WatchedPath>,
     #[serde(default)]
@@ -26,7 +26,7 @@ pub struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            profile_id: 0,
+            active_profile_ids: Vec::new(),
             profile_name: "Nieprzypisany".to_string(),
             watched_paths: Vec::new(),
             last_scan_time: 0, 
