@@ -1,43 +1,63 @@
 # 🛠️ Instrukcja Zarządzania Systemem File Monitor
 
-Poniższe zapytania SQL należy wykonywać z poziomu narzędzia **Query Tool** (np. w pgAdmin 4), po podłączeniu do bazy `monitoring_db`.
+Poniższe zapytania SQL należy wykonywać z poziomu narzędzia **Query Tool** (np. w pgAdmin 4), po podłączeniu do bazy danych.
 
 ---
 
-## 👥 1. Zarządzanie Profilami (Użytkownikami)
+## 💡 Ważne Przypomnienie – Grupy (`user_groups`)
+
+W bazie istnieją dwie główne grupy przypisane na stałe:
+
+| `group_id` | Nazwa | Opis |
+|---|---|---|
+| `1` | **Biuro** | Wiele profili/katalogów, dostęp chroniony jednym hasłem dla grupy |
+| `2` | **Brygadzista** | Dostęp do pojedynczego profilu budowy, każdy profil ma własne hasło |
+
+---
+
+## 👥 1. Zarządzanie Profilami (Katalogami/Osobami)
 
 **Tabela:** `public.monitoring_profiles`
 
-### 🟢 Dodawanie nowego profilu
+### 🟢 Dodawanie nowego profilu dla BIURA (`group_id = 1`)
 
-Tworzy nowe konto w systemie.  
-**Uwaga:** zawsze używaj funkcji `crypt()` do bezpiecznego hashowania kodu PIN.
+Tworzy nową kategorię ścieżek dostępną w panelu "Biuro". Hasło weryfikuje dostęp do całego panelu biurowego.
 
 ```sql
-INSERT INTO public.monitoring_profiles (profile_name, pin_code, description)
+INSERT INTO public.monitoring_profiles (group_id, profile_name, password_hash, description)
 VALUES (
-    'Księgowość',
-    crypt('HasloKsiegowej123!', gen_salt('bf')),
-    'Profil domyślny dla działu finansowego i księgowości.'
+    1,
+    'Księgowość i Kadry',
+    crypt('HasloBiura2024!', gen_salt('bf')),
+    'Katalogi z fakturami i dokumentacją pracowniczą.'
 );
 ```
 
----
+### 🟢 Dodawanie nowego profilu dla BRYGADZISTY (`group_id = 2`)
+
+Tworzy dedykowany profil konkretnej budowy. Hasło zdefiniowane tutaj będzie wymagane przez aplikację tylko po wybraniu tej konkretnej budowy.
+
+```sql
+INSERT INTO public.monitoring_profiles (group_id, profile_name, password_hash, description)
+VALUES (
+    2,
+    'Budowa Centrum - Jan Kowalski',
+    crypt('PINElektronik123', gen_salt('bf')),
+    'Projekt modernizacji centrum handlowego.'
+);
+```
 
 ### 🟡 Edycja danych profilu
 
-Pozwala na zmianę nazwy lub opisu istniejącego konta.  
-Upewnij się, że modyfikujesz właściwe `id`.
+Pozwala na zmianę nazwy lub opisu istniejącego konta. Pamiętaj, aby sprawdzić `id` profilu przed zmianą.
 
 ```sql
 UPDATE public.monitoring_profiles
-SET
-    profile_name = 'Główna Księgowość',
-    description = 'Zaktualizowany opis profilu z pełnym dostępem.'
-WHERE id = 1;
+SET 
+    profile_name = 'Budowa Centrum (ZAKOŃCZONA)',
+    description = 'Projekt archiwalny, monitorowanie tylko dla celów weryfikacji.'
+WHERE id = 2;
 ```
-
----
 
 ### 🔐 Resetowanie hasła (PIN-u)
 
@@ -45,22 +65,18 @@ Nadpisuje zapomniane hasło nowym, poprawnie zaszyfrowanym hashem.
 
 ```sql
 UPDATE public.monitoring_profiles
-SET
-    pin_code = crypt('NoweZresetowaneHaslo!@#', gen_salt('bf'))
-WHERE id = 1;
+SET 
+    password_hash = crypt('NoweBardzoSilneHaslo99!', gen_salt('bf'))
+WHERE id = 2;
 ```
-
----
 
 ### 🔴 Usuwanie profilu
 
-Trwale kasuje konto z systemu.
-
-⚠️ **Uwaga:** upewnij się, że usunięcie profilu nie narusza powiązań kluczy obcych (foreign keys) ze śledzonymi ścieżkami, chyba że masz włączoną opcję `ON DELETE CASCADE`.
+Trwale kasuje profil z systemu. Dzięki opcji `ON DELETE CASCADE`, wszystkie przypisane do niego ścieżki również zostaną usunięte.
 
 ```sql
 DELETE FROM public.monitoring_profiles
-WHERE id = 5;
+WHERE id = 2;
 ```
 
 ---
@@ -71,38 +87,33 @@ WHERE id = 5;
 
 ### 🟢 Dodawanie nowej ścieżki
 
-Przypisuje folder do konkretnego profilu (`profile_id`) i ustala niestandardowy komunikat powiadomienia.
+Przypisuje folder do konkretnego profilu (`profile_id`).
 
 ```sql
-INSERT INTO public.watched_paths (profile_id, path, notification_msg)
+INSERT INTO public.watched_paths (profile_id, path, notification_msg, is_active)
 VALUES (
-    1,
-    'C:\Wspolne\Faktury_2026',
-    'Pobrano nową fakturę! Kliknij przycisk Otwórz, aby sprawdzić.'
+    2,
+    'D:\Projekty\Budowa_X\Zdjęcia_Postępu',
+    'Nowe zdjęcia z placu budowy! Sprawdź folder.',
+    true
 );
 ```
 
----
+### ⏸️ Zawieszanie / Aktywacja śledzenia
 
-### 🟡 Edycja ścieżki / komunikatu
-
-Pozwala na zmianę lokalizacji folderu lub aktualizację tekstu powiadomienia.
+Zamiast usuwać ścieżkę, możesz ją tymczasowo wyłączyć.
 
 ```sql
 UPDATE public.watched_paths
-SET
-    path = 'D:\Nowy_Katalog\Faktury',
-    notification_msg = 'Uwaga! Nowy dokument w archiwum.'
-WHERE id = 2;
+SET is_active = false  -- zmień na true, aby włączyć ponownie
+WHERE id = 5;
 ```
 
----
+### 🔴 Usuwanie ścieżki
 
-### 🔴 Przerywanie śledzenia folderu
-
-Usuwa ścieżkę z bazy, co spowoduje, że Agent przestanie monitorować katalog przy kolejnej synchronizacji.
+Trwałe usunięcie folderu z listy monitorowania.
 
 ```sql
 DELETE FROM public.watched_paths
-WHERE id = 2;
+WHERE id = 5;
 ```
