@@ -1,0 +1,86 @@
+<UserControl
+    x:Class="FileMonitorAgent.App.Views.ProfileSelectionView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel Width="350" Margin="20">
+        <TextBlock
+            x:Name="TitleText"
+            Margin="0,0,0,15"
+            HorizontalAlignment="Center"
+            FontSize="18"
+            FontWeight="Bold"
+            Text="Logowanie" />
+
+        <StackPanel x:Name="OfficePasswordSection" Visibility="Collapsed">
+            <TextBlock Margin="0,0,0,5" Text="Hasło grupy (Wciśnij Enter):" />
+            <PasswordBox
+                x:Name="OfficePassword"
+                Height="35"
+                Margin="0,0,0,10"
+                KeyDown="OfficePassword_KeyDown" />
+            <Button
+                Height="30"
+                Margin="0,0,0,15"
+                Background="#6c757d"
+                Click="BtnUnlock_Click"
+                Content="Odblokuj listę"
+                Foreground="White" />
+        </StackPanel>
+
+        <ListBox
+            x:Name="ProfilesCheckList"
+            Height="150"
+            Margin="0,0,0,15"
+            BorderThickness="1"
+            Visibility="Collapsed">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <CheckBox
+                        Margin="5"
+                        Content="{Binding ProfileName}"
+                        IsChecked="{Binding IsSelected}" />
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <ListBox
+            x:Name="ProfilesList"
+            Height="150"
+            Margin="0,0,0,15"
+            DisplayMemberPath="ProfileName"
+            Visibility="Collapsed" />
+
+        <StackPanel x:Name="ForemanPasswordSection" Visibility="Collapsed">
+            <TextBlock Margin="0,0,0,5" Text="Hasło dla wybranej budowy (Wciśnij Enter):" />
+            <PasswordBox
+                x:Name="ForemanPassword"
+                Height="35"
+                Margin="0,0,0,10"
+                KeyDown="ForemanPassword_KeyDown" />
+        </StackPanel>
+
+        <Button
+            x:Name="BtnStart"
+            Height="45"
+            Background="#007ACC"
+            Click="BtnStart_Click"
+            Content="URUCHOM MONITORING"
+            FontWeight="Bold"
+            Foreground="White"
+            Visibility="Collapsed" />
+
+        <Button
+            Margin="0,10,0,0"
+            Background="Transparent"
+            BorderThickness="0"
+            Click="BtnBack_Click"
+            Content="Cofnij"
+            Foreground="Gray" />
+        <TextBlock
+            x:Name="StatusLabel"
+            Margin="0,10,0,0"
+            Foreground="Red"
+            TextAlignment="Center"
+            TextWrapping="Wrap" />
+    </StackPanel>
+</UserControl>
